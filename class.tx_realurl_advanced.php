@@ -360,7 +360,7 @@ class tx_realurl_advanced {
 				$result = array(
 					'pagepath' => trim($page['tx_realurl_pathsegment'], '/'),
 					'langID' => intval($lang),
-					'rootpage_id' => $this->getDomainRecordByPageUid($id)
+					'rootpage_id' => $this->getRootPageIdByPageId($id)
 				);
 			}
 			else {
