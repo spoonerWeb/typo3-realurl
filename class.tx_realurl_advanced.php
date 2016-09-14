@@ -360,9 +360,7 @@ class tx_realurl_advanced {
 				$result = array(
 					'pagepath' => trim($page['tx_realurl_pathsegment'], '/'),
 					'langID' => intval($lang),
-					// TODO Might be better to fetch root line here to process mount
-					// points and inner subdomains correctly.
-					'rootpage_id' => intval($this->conf['rootpage_id'])
+					'rootpage_id' => $this->getDomainRecordByPageUid($id)
 				);
 			}
 			else {
@@ -625,7 +623,7 @@ class tx_realurl_advanced {
 					$segTitleFieldArray = $this->apiWrapper->trimExplode(',', $this->conf['segTitleFieldList'] ? $this->conf['segTitleFieldList'] : TX_REALURL_SEGTITLEFIELDLIST_DEFAULT, 1);
 					$theTitle = '';
 					foreach ($segTitleFieldArray as $fieldName) {
-						if ($page[$fieldName]) {
+						if (isset($page[$fieldName]) && $page[$fieldName] !== '') {
 							$theTitle = $page[$fieldName];
 							break;
 						}
@@ -1078,7 +1076,7 @@ class tx_realurl_advanced {
 				// otherwise they will never be found
 				$uidTrack[$row['uid']] = $row;
 				foreach ($segTitleFieldArray as $fieldName) {
-					if ($row[$fieldName]) {
+					if (isset($row[$fieldName]) && $row[$fieldName] !== '') {
 						$encodedTitle = $this->encodeTitle($row[$fieldName]);
 						if (!isset($titles[$fieldName][$encodedTitle])) {
 							$titles[$fieldName][$encodedTitle] = $row['uid'];
@@ -1306,6 +1304,49 @@ class tx_realurl_advanced {
 			$this->sysPage = $this->apiWrapper->getPageRepository();
 			$this->sysPage->init($GLOBALS['TSFE']->showHiddenPage || $this->pObj->isBEUserLoggedIn());
 		}
+	}
+
+	/**
+	 * @param integer $pageUid
+	 * @return integer
+	 */
+	protected function getRootPageIdByPageId($pageUid) {
+		// Gets an array with all the pages down to pid = 0
+		$rootLine = \t3lib_BEfunc::BEgetRootLine($pageUid);
+
+		$rootPageUid = 0;
+		foreach ($rootLine as $page) {
+			if ($page['is_siteroot'] && $this->checkIfDomainExistsOnPage($page['uid'])) {
+				$rootPageUid = (integer)$page['uid'];
+				break;
+			}
+		}
+
+		if ($rootPageUid === 0) {
+			throw new \RuntimeException(
+				'Can\'t find either a domain record or a page "is_siteroot" in root line of page "' . $pageUid . '"', 1473854888909
+			);
+		}
+
+		return $rootPageUid;
+	}
+
+	/**
+	 * @param integer $pageUid
+	 * @return boolean
+	 */
+	protected function checkIfDomainExistsOnPage($pageUid) {
+		return is_array($this->getDomainRecordByPageUid($pageUid));
+	}
+
+	/**
+	 * @param integer $pageUid
+	 * @return array
+	 */
+	protected function getDomainRecordByPageUid($pageUid) {
+		return $GLOBALS['TYPO3_DB']->exec_SELECTgetSingleRow(
+			'*', 'sys_domain', 'pid = ' . $pageUid . ' AND NOT hidden', '', 'sorting'
+		);
 	}
 }
 
